@@ -10,11 +10,19 @@ use App\Http\Controllers\Api\V1\Leads\LeadActivityController;
 use App\Http\Controllers\Api\V1\Leads\LeadController;
 use App\Http\Controllers\Api\V1\Leads\LeadNoteController;
 use App\Http\Controllers\Api\V1\Pipeline\PipelineController;
+use App\Http\Controllers\Api\V1\PublicApi\PublicLeadController;
+use App\Http\Controllers\Api\V1\PublicApi\PublicServiceController;
 use App\Http\Controllers\Api\V1\Services\ServiceController;
 use App\Http\Controllers\Api\V1\Users\UserController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::prefix('public')->group(function () {
+        Route::get('/services', [PublicServiceController::class, 'index']);
+        Route::post('/leads', [PublicLeadController::class, 'store'])
+            ->middleware('throttle:public-leads');
+    });
+
     Route::prefix('auth')->group(function () {
         Route::post('/login', [AuthController::class, 'login'])
             ->middleware('throttle:auth');

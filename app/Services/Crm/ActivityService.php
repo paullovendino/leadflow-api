@@ -14,10 +14,10 @@ class ActivityService
     /**
      * @param  array<string, mixed>  $metadata
      */
-    public function record(Lead|Customer|Appointment $subject, User $actor, ActivityType $type, string $description, array $metadata = []): Activity
+    public function record(Lead|Customer|Appointment $subject, ?User $actor, ActivityType $type, string $description, array $metadata = []): Activity
     {
         return $subject->activities()->create([
-            'user_id' => $actor->id,
+            'user_id' => $actor?->id,
             'type' => $type,
             'description' => $description,
             'metadata' => $metadata,

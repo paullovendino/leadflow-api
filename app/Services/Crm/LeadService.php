@@ -3,6 +3,7 @@
 namespace App\Services\Crm;
 
 use App\Enums\ActivityType;
+use App\Enums\LeadSource;
 use App\Models\Lead;
 use App\Models\PipelineStage;
 use App\Models\Service;
@@ -92,6 +93,38 @@ class LeadService
             }
 
             return $lead->load(['service', 'assignedUser', 'pipelineStage.pipeline', 'customer']);
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public function createPublicLead(array $attributes): Lead
+    {
+        return DB::transaction(function () use ($attributes) {
+            $stage = $this->resolveCreateStage(null);
+            $service = $this->resolveService($attributes['service_id'] ?? null);
+
+            $lead = Lead::query()->create([
+                'name' => $attributes['name'],
+                'email' => $attributes['email'] ?? null,
+                'phone' => $attributes['phone'] ?? null,
+                'service_id' => $service?->id,
+                'source' => LeadSource::Website,
+                'message' => $attributes['message'] ?? null,
+                'assigned_user_id' => null,
+                'pipeline_stage_id' => $stage->id,
+            ]);
+
+            $this->activities->record(
+                $lead,
+                null,
+                ActivityType::LeadCreated,
+                'Lead submitted from the website',
+                ['source' => LeadSource::Website->value],
+            );
+
+            return $lead->load(['service', 'pipelineStage']);
         });
     }
 

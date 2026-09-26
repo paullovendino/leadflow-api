@@ -45,6 +45,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        RateLimiter::for('public-leads', function (Request $request) {
+            return Limit::perMinute(10)->by($request->ip());
+        });
+
         Gate::before(function (User $user, string $ability): ?bool {
             return $user->role === UserRole::Administrator ? true : null;
         });
