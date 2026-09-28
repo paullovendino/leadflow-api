@@ -27,6 +27,17 @@ class StoreAppointmentRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'customer_id.exists' => 'The selected customer could not be found.',
+            'service_id.exists' => 'This service is no longer available.',
+        ];
+    }
+
     protected function prepareForValidation(): void
     {
         if ($this->input('notes') === '') {

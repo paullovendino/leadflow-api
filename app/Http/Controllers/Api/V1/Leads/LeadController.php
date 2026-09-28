@@ -7,11 +7,13 @@ use App\Http\Requests\Api\V1\Leads\AssignLeadRequest;
 use App\Http\Requests\Api\V1\Leads\ConvertLeadRequest;
 use App\Http\Requests\Api\V1\Leads\IndexLeadRequest;
 use App\Http\Requests\Api\V1\Leads\MoveLeadStageRequest;
+use App\Http\Requests\Api\V1\Leads\QualifyLeadRequest;
 use App\Http\Requests\Api\V1\Leads\StoreLeadRequest;
 use App\Http\Requests\Api\V1\Leads\UpdateLeadRequest;
 use App\Http\Resources\Api\V1\LeadResource;
 use App\Models\Lead;
 use App\Services\Crm\LeadConversionService;
+use App\Services\Crm\LeadQualificationService;
 use App\Services\Crm\LeadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -59,5 +61,21 @@ class LeadController extends Controller
     public function convert(ConvertLeadRequest $request, Lead $lead, LeadConversionService $conversions): LeadResource
     {
         return new LeadResource($conversions->convertLead($request->user(), $lead));
+    }
+
+    public function qualify(QualifyLeadRequest $request, Lead $lead, LeadQualificationService $qualifications): LeadResource
+    {
+        $result = $qualifications->qualifyLead($request->user(), $lead);
+
+        $message = $result['already_qualified']
+            ? 'Lead is already qualified.'
+            : ($result['customer_created']
+                ? 'Lead qualified successfully. Customer created and linked.'
+                : 'Lead qualified successfully. Existing customer linked.');
+
+        return (new LeadResource($result['lead']))->additional([
+            'message' => $message,
+            'customer_created' => $result['customer_created'],
+        ]);
     }
 }

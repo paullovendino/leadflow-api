@@ -41,4 +41,9 @@ class LeadPolicy
     {
         return $this->view($actor, $lead);
     }
+
+    public function qualify(User $actor, Lead $lead): bool
+    {
+        return $this->view($actor, $lead);
+    }
 }

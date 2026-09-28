@@ -352,5 +352,11 @@ class LeadService
                 'pipeline_stage_id' => ['The selected pipeline stage is inactive.'],
             ]);
         }
+
+        if ($stage->slug === 'qualified' && $lead->pipelineStage?->slug !== 'qualified') {
+            throw ValidationException::withMessages([
+                'pipeline_stage_id' => ['Use the qualify action to move a lead to Qualified.'],
+            ]);
+        }
     }
 }

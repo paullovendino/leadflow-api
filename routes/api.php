@@ -72,6 +72,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/leads/{lead}/notes', [LeadNoteController::class, 'store']);
         Route::get('/leads/{lead}/activities', [LeadActivityController::class, 'index']);
         Route::post('/leads/{lead}/convert', [LeadController::class, 'convert']);
+        Route::post('/leads/{lead}/qualify', [LeadController::class, 'qualify']);
 
         Route::get('/customers', [CustomerController::class, 'index']);
         Route::post('/customers', [CustomerController::class, 'store']);

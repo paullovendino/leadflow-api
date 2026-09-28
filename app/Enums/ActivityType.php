@@ -10,6 +10,7 @@ enum ActivityType: string
     case NoteAdded = 'note_added';
     case LeadUpdated = 'lead_updated';
     case LeadConverted = 'lead_converted';
+    case LeadQualified = 'lead_qualified';
     case CustomerCreated = 'customer_created';
     case AppointmentCreated = 'appointment_created';
     case AppointmentUpdated = 'appointment_updated';

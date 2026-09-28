@@ -75,7 +75,14 @@ class AppointmentService
      */
     public function create(User $actor, array $attributes): Appointment
     {
-        $customer = Customer::query()->findOrFail($attributes['customer_id']);
+        $customer = Customer::query()->find($attributes['customer_id']);
+
+        if ($customer === null) {
+            throw ValidationException::withMessages([
+                'customer_id' => ['The selected customer could not be found.'],
+            ]);
+        }
+
         $this->assertCanViewCustomer($actor, $customer);
 
         $service = $this->resolveBookableService((int) $attributes['service_id']);
@@ -85,10 +92,12 @@ class AppointmentService
         $end = $this->endTimeFor($start, $service->duration_minutes);
 
         $this->assertNotInPast($date, $start);
-        $this->assertFitsAvailability($staff, $date, $start, $end);
-        $this->assertNoOverlap($staff, $date, $start, $end);
 
         return DB::transaction(function () use ($actor, $attributes, $customer, $service, $staff, $date, $start, $end) {
+            $this->lockStaffDay($staff, $date);
+            $this->assertFitsAvailability($staff, $date, $start, $end);
+            $this->assertNoOverlap($staff, $date, $start, $end);
+
             $appointment = Appointment::query()->create([
                 'customer_id' => $customer->id,
                 'service_id' => $service->id,
@@ -151,11 +160,15 @@ class AppointmentService
 
         if ($schedulingTouched) {
             $this->assertNotInPast($date, $start);
-            $this->assertFitsAvailability($staff, $date, $start, $end);
-            $this->assertNoOverlap($staff, $date, $start, $end, $appointment->id);
         }
 
         return DB::transaction(function () use ($actor, $appointment, $attributes, $service, $staff, $date, $start, $end, $schedulingTouched, $previousWhen) {
+            if ($schedulingTouched) {
+                $this->lockStaffDay($staff, $date);
+                $this->assertFitsAvailability($staff, $date, $start, $end);
+                $this->assertNoOverlap($staff, $date, $start, $end, $appointment->id);
+            }
+
             $appointment->update([
                 'service_id' => $service->id,
                 'staff_user_id' => $staff->id,
@@ -268,15 +281,9 @@ class AppointmentService
     {
         $service = Service::query()->find($serviceId);
 
-        if ($service === null) {
+        if ($service === null || ! $service->is_active) {
             throw ValidationException::withMessages([
-                'service_id' => ['The selected service does not exist.'],
-            ]);
-        }
-
-        if (! $service->is_active) {
-            throw ValidationException::withMessages([
-                'service_id' => ['Inactive services cannot be booked.'],
+                'service_id' => ['This service is no longer available.'],
             ]);
         }
 
@@ -348,9 +355,19 @@ class AppointmentService
     {
         if ($this->hasOverlap($staff, $date, $start, $end, $ignoreId)) {
             throw ValidationException::withMessages([
-                'start_time' => ['This appointment overlaps an existing appointment for that staff member.'],
+                'start_time' => ['This time slot is no longer available. Please select another time.'],
             ]);
         }
+    }
+
+    private function lockStaffDay(User $staff, Carbon $date): void
+    {
+        Appointment::query()
+            ->where('staff_user_id', $staff->id)
+            ->whereDate('scheduled_date', $date->toDateString())
+            ->where('status', '!=', AppointmentStatus::Cancelled->value)
+            ->lockForUpdate()
+            ->get();
     }
 
     private function hasOverlap(User $staff, Carbon $date, string $start, string $end, ?int $ignoreId = null): bool
