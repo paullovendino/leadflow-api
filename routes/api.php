@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Availability\StaffAvailabilityController;
 use App\Http\Controllers\Api\V1\Customers\CustomerActivityController;
 use App\Http\Controllers\Api\V1\Customers\CustomerController;
+use App\Http\Controllers\Api\V1\Dashboard\DashboardController;
 use App\Http\Controllers\Api\V1\Customers\CustomerNoteController;
 use App\Http\Controllers\Api\V1\Leads\LeadActivityController;
 use App\Http\Controllers\Api\V1\Leads\LeadController;
@@ -34,6 +35,8 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::middleware(['auth:sanctum', 'active'])->group(function () {
+        Route::get('/dashboard', [DashboardController::class, 'show']);
+
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
         Route::get('/users/{user}', [UserController::class, 'show']);
