@@ -97,13 +97,13 @@ class LeadQualificationTest extends TestCase
         ]);
     }
 
-    public function test_existing_customer_is_linked_when_phone_matches(): void
+    public function test_existing_customer_is_linked_when_phone_matches_and_emails_do_not_conflict(): void
     {
         $this->seedDefaultPipeline();
         $manager = User::factory()->manager()->create();
         $customer = Customer::factory()->create([
             'name' => 'Existing Mary',
-            'email' => 'mary@example.com',
+            'email' => null,
             'phone' => '09171234567',
         ]);
         $lead = Lead::factory()->create([
@@ -121,6 +121,35 @@ class LeadQualificationTest extends TestCase
 
         $this->assertSame(1, Customer::query()->count());
         $this->assertSame($customer->id, $lead->refresh()->customer_id);
+    }
+
+    public function test_same_phone_with_different_emails_creates_a_new_customer(): void
+    {
+        $this->seedDefaultPipeline();
+        $manager = User::factory()->manager()->create();
+        $existing = Customer::factory()->create([
+            'name' => 'Isaac Villalva',
+            'email' => 'ice@gmail.com',
+            'phone' => '09123456789',
+        ]);
+        $lead = Lead::factory()->create([
+            'name' => 'John Lovendino',
+            'email' => 'john@gmail.com',
+            'phone' => '09123456789',
+            'pipeline_stage_id' => $this->stageBySlug('contacted')->id,
+        ]);
+
+        $this->actingAs($manager)
+            ->postJson("/api/v1/leads/{$lead->id}/qualify")
+            ->assertOk()
+            ->assertJsonPath('customer_created', true)
+            ->assertJsonPath('data.customer.name', 'John Lovendino')
+            ->assertJsonPath('data.customer.email', 'john@gmail.com');
+
+        $lead->refresh();
+
+        $this->assertNotSame($existing->id, $lead->customer_id);
+        $this->assertSame(2, Customer::query()->count());
     }
 
     public function test_existing_customer_is_reused_when_email_and_phone_match(): void
@@ -146,11 +175,11 @@ class LeadQualificationTest extends TestCase
         $this->assertSame(1, Customer::query()->count());
     }
 
-    public function test_conflicting_email_and_phone_matches_are_rejected(): void
+    public function test_email_match_wins_when_phone_belongs_to_a_different_customer(): void
     {
         $this->seedDefaultPipeline();
         $manager = User::factory()->manager()->create();
-        Customer::factory()->create([
+        $emailMatch = Customer::factory()->create([
             'name' => 'Customer A',
             'email' => 'john@example.com',
             'phone' => '09171111111',
@@ -168,15 +197,12 @@ class LeadQualificationTest extends TestCase
 
         $this->actingAs($manager)
             ->postJson("/api/v1/leads/{$lead->id}/qualify")
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors(['lead']);
+            ->assertOk()
+            ->assertJsonPath('customer_created', false)
+            ->assertJsonPath('data.customer.id', $emailMatch->id);
 
-        $this->assertNull($lead->refresh()->customer_id);
-        $this->assertSame($this->stageBySlug('contacted')->id, $lead->pipeline_stage_id);
+        $this->assertSame($emailMatch->id, $lead->refresh()->customer_id);
         $this->assertSame(2, Customer::query()->count());
-        $this->assertDatabaseMissing('activities', [
-            'type' => ActivityType::LeadQualified->value,
-        ]);
     }
 
     public function test_duplicate_customer_emails_are_treated_as_a_conflict(): void

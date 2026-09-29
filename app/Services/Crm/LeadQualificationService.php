@@ -132,7 +132,20 @@ class LeadQualificationService
 
         $phoneMatches = $phoneKey === null
             ? collect()
-            : $candidates->filter(fn (Customer $customer) => $this->phoneMatchKey($customer->phone) === $phoneKey);
+            : $candidates->filter(function (Customer $customer) use ($email, $phoneKey) {
+                if ($this->phoneMatchKey($customer->phone) !== $phoneKey) {
+                    return false;
+                }
+
+                $customerEmail = $this->normalizedEmail($customer->email);
+
+                // Same phone with two different emails is two people, not one customer.
+                if ($email !== null && $customerEmail !== null && $customerEmail !== $email) {
+                    return false;
+                }
+
+                return true;
+            });
 
         $matched = Collection::make()
             ->merge($emailMatches)

@@ -21,6 +21,12 @@ class AppointmentManagementTest extends TestCase
     use RefreshDatabase;
     use SeedsDefaultPipeline;
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
+
     public function test_administrator_can_create_a_valid_appointment(): void
     {
         [$administrator, $staff, $customer, $service, $date] = $this->bookingContext(actorRole: 'administrator');
@@ -564,6 +570,40 @@ class AppointmentManagementTest extends TestCase
         $this->assertNotContains('10:00', $starts);
         $this->assertNotContains('10:30', $starts);
         $this->assertNotContains('16:30', $starts);
+    }
+
+    public function test_available_slots_for_today_exclude_past_starts(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-09-28 14:17:00', config('app.timezone')));
+
+        $manager = User::factory()->manager()->create();
+        $staff = User::factory()->staff()->create();
+        $service = Service::factory()->create(['duration_minutes' => 60]);
+        $this->openAvailability($staff);
+        $today = now()->toDateString();
+        $nextMonday = now()->next(Carbon::MONDAY)->toDateString();
+
+        $todayStarts = collect(
+            $this->actingAs($manager)
+                ->getJson('/api/v1/appointments/slots?staff_user_id='.$staff->id.'&date='.$today.'&service_id='.$service->id)
+                ->assertOk()
+                ->json('data'),
+        )->pluck('start_time');
+
+        $this->assertFalse($todayStarts->contains('09:00'));
+        $this->assertFalse($todayStarts->contains('14:00'));
+        $this->assertTrue($todayStarts->contains('14:30'));
+        $this->assertTrue($todayStarts->contains('15:00'));
+
+        $futureStarts = collect(
+            $this->actingAs($manager)
+                ->getJson('/api/v1/appointments/slots?staff_user_id='.$staff->id.'&date='.$nextMonday.'&service_id='.$service->id)
+                ->assertOk()
+                ->json('data'),
+        )->pluck('start_time');
+
+        $this->assertTrue($futureStarts->contains('09:00'));
+        $this->assertTrue($futureStarts->contains('14:00'));
     }
 
     public function test_customer_detail_includes_appointments(): void

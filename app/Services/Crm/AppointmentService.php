@@ -254,6 +254,9 @@ class AppointmentService
         $windows = $this->activeWindows($staff, $scheduled);
         $stepMinutes = 30;
         $slots = [];
+        $now = now();
+        $isToday = $scheduled->toDateString() === $now->toDateString();
+        $nowTime = $now->format('H:i:s');
 
         foreach ($windows as $window) {
             $cursor = $this->timeToMinutes($this->normalizeTime((string) $window->start_time));
@@ -262,6 +265,11 @@ class AppointmentService
             while ($cursor + $service->duration_minutes <= $windowEnd) {
                 $start = $this->minutesToTime($cursor);
                 $end = $this->endTimeFor($start, $service->duration_minutes);
+
+                if ($isToday && $start < $nowTime) {
+                    $cursor += $stepMinutes;
+                    continue;
+                }
 
                 if (! $this->hasOverlap($staff, $scheduled, $start, $end, $ignoreAppointmentId)) {
                     $slots[] = [
